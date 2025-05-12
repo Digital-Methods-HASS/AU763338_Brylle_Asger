@@ -1,0 +1,200 @@
+---
+title: "Final Project: The Economics of Football"
+author: "Asger, Laurits, Sejer og Nikolaj"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This project revolves around international football and its economics. Specifically are we focusing on the transfer fees between the players from the season of 1924/1925 up until this season of 2024/2025. We are covering the top-10-transfers every season. With that are we looking into the cost development of said transfers. 
+
+First of all are we going to load tidyverse and other necessary packages. 
+
+```{r tidyverse}
+library(tidyverse)
+```
+
+## Loading our data
+
+Afterwards we need to load our own dataset into R.
+
+```{r data, echo=FALSE}
+read_csv("data/Final Project.csv",na="NULL")
+footballtransfer <- read_csv("data/Final Project.csv", na="NULL")
+
+```
+
+Next are we defining our data.
+
+```{r class}
+class(footballtransfer)
+
+```
+
+## Plotting our data
+
+Now we are going to make a basic graph showing the development of the costs using ggplot. 
+
+```{r ggplot,echo=FALSE}
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(scales)  # for formatting Y-axis labels
+
+# Load the data
+footballtransfer <- read_csv("data/Final Project.csv")
+
+# Convert Average to numeric safely, so R can read it better.
+footballtransfer <- footballtransfer %>%
+  mutate(Average = as.numeric(gsub(",", ".", Average))) %>%
+  filter(!is.na(Average), !is.na(Season))
+
+# Get every 5th season label, so the X-axis is more readable. 
+season_breaks <- footballtransfer$Season[seq(1, nrow(footballtransfer), by = 5)]
+
+# Create the plot
+ggplot(data = footballtransfer, aes(x = Season, y = Average)) +
+  geom_line(group = 1, color = "blue") +
+  geom_point(color = "red") +
+  labs(
+    title = "Average over Season",
+    x = "Season",
+    y = "Average"
+  ) +
+  scale_x_discrete(breaks = season_breaks) +
+  scale_y_continuous(labels = label_comma()) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+## Analyzing time periods
+
+We are splitting the graph into three different time periods, so that the graphs are easier to analyze and for the reader. The data is split and defined as an early period of football from 1924/1925 until 1955/1956. The next time period have we defined as the middle or rising period of football from 1956/1957 until 1989/1990. The last periode have we defined as the modern period of football from 1990/1991 until today in the 2024/2025 season. 
+
+```{r two plots, echo=FALSE}
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(scales)
+
+# Load the data
+footballtransfer <- read_csv("data/Final Project.csv")
+
+# Convert Average to numeric safely
+footballtransfer <- footballtransfer %>%
+  mutate(Average = as.numeric(gsub(",", ".", Average))) %>%
+  filter(!is.na(Average), !is.na(Season))
+
+# Extract the starting year from the Season string
+footballtransfer <- footballtransfer %>%
+  mutate(StartYear = as.numeric(substr(Season, 1, 4)))
+
+# Split the data into three time periods
+period1 <- footballtransfer %>% filter(StartYear >= 1924 & StartYear <= 1956)
+period2 <- footballtransfer %>% filter(StartYear >= 1957 & StartYear <= 1989)
+period3 <- footballtransfer %>% filter(StartYear >= 1990)
+
+# We omit the 1956/57 season, because the season is an outlier that shadows the rest
+period1 <- footballtransfer %>%
+  filter(StartYear >= 1924 & StartYear <= 1956) %>%
+  filter(!grepl("1956", Season))
+
+# Helper function to create plot
+create_plot <- function(data, title) {
+  season_breaks <- data$Season[seq(1, nrow(data), by = 2)]
+  
+  ggplot(data, aes(x = Season, y = Average)) +
+    geom_line(group = 1, color = "blue") +
+    geom_point(color = "red") +
+    labs(
+      title = title,
+      x = "Season",
+      y = "Average"
+    ) +
+    scale_x_discrete(breaks = season_breaks) +
+    scale_y_continuous(labels = label_comma()) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Create the plots
+plot1 <- create_plot(period1, "Early period: Average over Season (1924/25 – 1956/57)")
+plot2 <- create_plot(period2, "Middle period: Average over Season (1957/58 – 1989/90)")
+plot3 <- create_plot(period3, "Modern period: Average over Season (1990/91 – 2024/25)")
+
+# Print the plots
+print(plot1)
+print(plot2)
+print(plot3)
+
+```
+
+## Playing with percentages
+
+To understand the data better we are going to convert the price changes per year into percentage, so that the data is more comparable.  
+
+```{r percentages, echo=FALSE}
+footballtransfer <- footballtransfer %>%
+  arrange(StartYear) %>%
+  mutate(PercentChange = (Average - lag(Average)) / lag(Average) * 100)
+
+footballtransfer %>%
+  select(Season, PercentChange)
+
+```
+
+```{r percentages_plot, echo=FALSE}
+# Load and clean data
+footballtransfer <- footballtransfer %>%
+  mutate(Average = as.numeric(gsub(",", ".", Average))) %>%
+  filter(!is.na(Average), !is.na(Season)) %>%
+  mutate(
+    StartYear = as.numeric(substr(Season, 1, 4)),
+    PercentChange = (Average - lag(Average)) / lag(Average) * 100
+  ) %>%
+  arrange(StartYear)
+
+# Split into 3 periods
+period1 <- footballtransfer %>% filter(StartYear >= 1924 & StartYear <= 1956)
+period2 <- footballtransfer %>% filter(StartYear >= 1957 & StartYear <= 1989)
+period3 <- footballtransfer %>% filter(StartYear >= 1990)
+
+# Helper function to create percentage change plot
+plot_percent_change <- function(data, title) {
+  season_breaks <- data$Season[seq(1, nrow(data), by = 2)]
+  
+  ggplot(data, aes(x = Season, y = PercentChange)) +
+    geom_col(aes(fill = PercentChange > 0), show.legend = FALSE) +
+    scale_fill_manual(values = c("TRUE" = "#2E86AB", "FALSE" = "#E74C3C")) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    labs(
+      title = title,
+      x = "Season",
+      y = "Percent Change (%)"
+    ) +
+    scale_x_discrete(breaks = season_breaks) +
+    theme_minimal(base_size = 13) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Create the 3 plots
+percent1 <- plot_percent_change(period1, "Early period: Percent Change (1924/25 – 1956/57)")
+percent2 <- plot_percent_change(period2, "Middle period: Percent Change (1957/58 – 1989/90)")
+percent3 <- plot_percent_change(period3, "Modern period: Percent Change (1990/91 – 2024/25)")
+
+# Display the plots
+print(percent1)
+print(percent2)
+print(percent3)
+
+```
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
